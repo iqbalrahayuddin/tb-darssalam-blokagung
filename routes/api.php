@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\ForgotPasswordController; // <-- Import
 use App\Http\Controllers\Api\PemasukanController; // <-- Import
 use App\Http\Controllers\Api\PengeluaranController; // <-- Import
 use App\Http\Controllers\Api\DashboardController; // <-- Import
+use App\Http\Controllers\Api\UserController; // <-- Import
+use App\Http\Controllers\Api\LaporanController; // <-- Import
 
 // Endpoint publik
 Route::post('/register', [AuthController::class, 'register']);
@@ -38,5 +40,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route untuk logout
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // --- RUTE BARU UNTUK MANAJEMEN USER (CRUD) ---
+    Route::apiResource('/users', UserController::class)->except(['show']);
+
+    // Rute untuk mengunduh laporan keuangan dalam format PDF
+    Route::get('/laporan-pdf', [LaporanController::class, 'downloadLaporanKeuangan']);
     // (Anda bisa tambahkan route API lain yang aman di sini)
 });

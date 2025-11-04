@@ -2,55 +2,59 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\Models\Pengeluaran;
+use App\Models\Pengeluaran; // Pastikan Model-nya benar
 use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class PengeluaranController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * READ (Daftar)
      */
     public function index(Request $request)
     {
-        // Ambil id_saas dari user yang terautentikasi
-        $idSaas = $request->user()->id_saas;
-
+        $idSaas = Auth::user()->id_saas;
         $pengeluaran = Pengeluaran::where('id_saas', $idSaas)
-                                 ->orderBy('tanggal', 'desc')
-                                 ->get();
+            ->orderBy('tanggal', 'desc')
+            ->get();
 
+        // Mengembalikan format Objek {'data': ...} agar Flutter tidak error
         return response()->json([
             'data' => $pengeluaran
         ], 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * CREATE
      */
     public function store(Request $request)
     {
+        $userSaasId = Auth::user()->id_saas;
+
         $validator = Validator::make($request->all(), [
-            'id_saas' => 'required|string',
+            // id_saas tidak lagi divalidasi dari input, tapi diambil dari Auth
             'keterangan' => 'required|string|max:255',
             'jumlah' => 'required|numeric|min:0',
-            'tanggal' => 'required|date',
-            'nota' => 'required|string|unique:pengeluarans,nota',
+            'tanggal' => 'required|date_format:Y-m-d', // Samakan formatnya
+            
+            // 'nota' telah dihapus dari validasi
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            // Format error disamakan dengan PemasukanController
+            return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
         }
 
-        // Pastikan id_saas di request sama dengan id_saas user
-        if ($request->user()->id_saas != $request->id_saas) {
-            return response()->json(['message' => 'Unauthorized action.'], 403);
-        }
+        // Ambil data yang divalidasi dan tambahkan id_saas secara paksa
+        $dataToCreate = $validator->validated();
+        $dataToCreate['id_saas'] = $userSaasId; // <-- Keamanan Multi-tenant
 
-        $pengeluaran = Pengeluaran::create($validator->validated());
+        $pengeluaran = Pengeluaran::create($dataToCreate);
 
+        // Mengembalikan format JSON seperti kode asli
         return response()->json([
             'message' => 'Pengeluaran berhasil ditambahkan',
             'data' => $pengeluaran
@@ -58,53 +62,48 @@ class PengeluaranController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * READ (Single)
+     * Menggunakan Route Model Binding
      */
-    public function show(string $id)
+    public function show(Pengeluaran $pengeluaran)
     {
-        $pengeluaran = Pengeluaran::find($id);
-
-        if (!$pengeluaran) {
-            return response()->json(['message' => 'Data tidak ditemukan'], 404);
-        }
-
         // Cek otorisasi
-        if ($pengeluaran->id_saas != Auth::user()->id_saas) {
+        if (Auth::user()->id_saas != $pengeluaran->id_saas) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return response()->json(['data' => $pengeluaran], 200);
+        // Mengembalikan format JSON seperti kode asli
+        return response()->json([
+            'data' => $pengeluaran
+        ], 200);
     }
 
     /**
-     * Update the specified resource in storage.
+     * UPDATE
+     * Menggunakan Route Model Binding
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Pengeluaran $pengeluaran)
     {
-        $pengeluaran = Pengeluaran::find($id);
-
-        if (!$pengeluaran) {
-            return response()->json(['message' => 'Data tidak ditemukan'], 404);
-        }
-
         // Cek otorisasi
-        if ($pengeluaran->id_saas != Auth::user()->id_saas) {
+        if (Auth::user()->id_saas != $pengeluaran->id_saas) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $validator = Validator::make($request->all(), [
             'keterangan' => 'sometimes|required|string|max:255',
             'jumlah' => 'sometimes|required|numeric|min:0',
-            'tanggal' => 'sometimes|required|date',
-            // Nota dan id_saas tidak diizinkan di-update
+            'tanggal' => 'sometimes|required|date_format:Y-m-d',
+            // nota dan id_saas tidak diizinkan di-update
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            // Format error disamakan dengan PemasukanController
+            return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
         }
 
         $pengeluaran->update($validator->validated());
 
+        // Mengembalikan format JSON seperti kode asli
         return response()->json([
             'message' => 'Pengeluaran berhasil diupdate',
             'data' => $pengeluaran
@@ -112,24 +111,21 @@ class PengeluaranController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * DELETE
+     * Menggunakan Route Model Binding
      */
-    public function destroy(string $id)
+    public function destroy(Pengeluaran $pengeluaran)
     {
-        $pengeluaran = Pengeluaran::find($id);
-
-        if (!$pengeluaran) {
-            return response()->json(['message' => 'Data tidak ditemukan'], 404);
-        }
-
         // Cek otorisasi
-        if ($pengeluaran->id_saas != Auth::user()->id_saas) {
+        if (Auth::user()->id_saas != $pengeluaran->id_saas) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $pengeluaran->delete();
 
-        // Flutter Anda mengharapkan 200 atau 204
-        return response()->json(['message' => 'Pengeluaran berhasil dihapus'], 200);
+        // Mengembalikan format JSON seperti kode asli (200 OK dengan message)
+        return response()->json([
+            'message' => 'Pengeluaran berhasil dihapus'
+        ], 200);
     }
 }

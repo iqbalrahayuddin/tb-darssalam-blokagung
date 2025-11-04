@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('id_saas'); // Sesuai dengan kode Flutter
             $table->date('tanggal');
-            $table->string('nota')->unique();
             $table->string('keterangan');
             $table->decimal('jumlah', 15, 2); // Gunakan decimal untuk uang
             $table->timestamps();

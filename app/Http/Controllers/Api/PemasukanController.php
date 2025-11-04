@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-// use Illuminate\Support\Facades\Storage; // <-- Tidak perlu lagi
 use Illuminate\Validation\Rule;
 
 class PemasukanController extends Controller
@@ -22,7 +21,10 @@ class PemasukanController extends Controller
                             ->orderBy('tanggal', 'desc')
                             ->get();
 
-        return response()->json(['data' => $pemasukan]);
+        // Mengembalikan format Objek {'data': ...}
+        return response()->json([
+            'data' => $pemasukan
+        ], 200);
     }
 
     /**
@@ -33,21 +35,29 @@ class PemasukanController extends Controller
         $userSaasId = Auth::user()->id_saas;
 
         $validator = Validator::make($request->all(), [
-            'id_saas' => ['required', 'uuid', Rule::in([$userSaasId])],
+            // id_saas diambil dari Auth, bukan input
             'keterangan' => 'required|string|max:255',
             'jumlah' => 'required|numeric|min:0',
             'tanggal' => 'required|date_format:Y-m-d',
-            'nota' => 'required|string|max:100',
-            // 'bukti_file' => ... // <-- DIHAPUS
+            // 'nota' => 'required|string|max:100', // <-- DIHAPUS
         ]);
 
         if ($validator->fails()) {
+            // Format error disamakan
             return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
         }
-        
-        $pemasukan = Pemasukan::create($validator->validated());
 
-        return response()->json($pemasukan, 201);
+        // Ambil data yang divalidasi dan tambahkan id_saas secara paksa
+        $dataToCreate = $validator->validated();
+        $dataToCreate['id_saas'] = $userSaasId; // <-- Keamanan Multi-tenant
+
+        $pemasukan = Pemasukan::create($dataToCreate);
+
+        // Format response disamakan
+        return response()->json([
+            'message' => 'Pemasukan berhasil ditambahkan',
+            'data' => $pemasukan
+        ], 201);
     }
 
     /**
@@ -58,12 +68,15 @@ class PemasukanController extends Controller
         if (Auth::user()->id_saas != $pemasukan->id_saas) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-        return response()->json($pemasukan);
+        
+        // Format response disamakan
+        return response()->json([
+            'data' => $pemasukan
+        ], 200);
     }
 
     /**
      * UPDATE
-     * (Kembali menggunakan method 'update' standar dari apiResource)
      */
     public function update(Request $request, Pemasukan $pemasukan)
     {
@@ -75,17 +88,20 @@ class PemasukanController extends Controller
             'keterangan' => 'sometimes|required|string|max:255',
             'jumlah' => 'sometimes|required|numeric|min:0',
             'tanggal' => 'sometimes|required|date_format:Y-m-d',
-            // 'bukti_file' => ... // <-- DIHAPUS
-            // 'bukti_path' => ... // <-- DIHAPUS
         ]);
 
         if ($validator->fails()) {
+            // Format error disamakan
             return response()->json(['message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
         }
 
         $pemasukan->update($validator->validated());
 
-        return response()->json($pemasukan);
+        // Format response disamakan
+        return response()->json([
+            'message' => 'Pemasukan berhasil diupdate',
+            'data' => $pemasukan
+        ], 200);
     }
 
     /**
@@ -96,11 +112,12 @@ class PemasukanController extends Controller
         if (Auth::user()->id_saas != $pemasukan->id_saas) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
-
-        // if ($pemasukan->bukti_path) { ... } // <-- DIHAPUS
         
         $pemasukan->delete();
 
-        return response()->json(null, 204);
+        // Format response disamakan (200 OK dengan message)
+        return response()->json([
+            'message' => 'Pemasukan berhasil dihapus'
+        ], 200);
     }
 }

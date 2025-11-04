@@ -20,7 +20,7 @@ return new class extends Migration
             
             // --- TAMBAHAN ---
             $table->string('nama_toko');
-            $table->uuid('id_saas')->unique(); // Menggunakan UUID untuk id_saas unik
+            $table->uuid('id_saas'); // Menggunakan UUID untuk id_saas unik
             // ----------------
             
             $table->rememberToken();

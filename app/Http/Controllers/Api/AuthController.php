@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str; // <-- TAMBAHKAN UNTUK MEMBUAT UUID
+// use Illuminate\Support\Str; // <-- Dihapus, tidak perlu lagi
 
 class AuthController extends Controller
 {
@@ -18,12 +18,12 @@ class AuthController extends Controller
      */
     public function register(Request $request): JsonResponse
     {
-        // 1. Validasi input (tambah nama_toko)
+        // 1. Validasi input
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'nama_toko' => 'required|string|max:255', // <-- TAMBAHKAN
+            'nama_toko' => 'required|string|max:255', 
         ]);
 
         if ($validator->fails()) {
@@ -40,8 +40,11 @@ class AuthController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'nama_toko' => $request->nama_toko, // <-- TAMBAHKAN
-                'id_saas' => (string) Str::uuid(),  // <-- BUAT id_saas OTOMATIS
+                'nama_toko' => $request->nama_toko, 
+                
+                // --- PERUBAHAN SESUAI PERMINTAAN ---
+                // id_saas diisi dari nama_toko saat registrasi admin pertama
+                'id_saas' => $request->nama_toko, 
             ]);
 
             $token = $user->createToken('auth_token')->plainTextToken;
@@ -60,12 +63,14 @@ class AuthController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Registrasi gagal.',
-                'errors' => $e->getMessage()
+                // 'errors' mengirim string, BUKAN map. Ini yang menyebabkan error di Flutter.
+                'errors' => $e->getMessage() 
             ], 500);
         }
     }
 
-    // ... (Fungsi login() tidak berubah) ...
+    // ... (Fungsi login() dan logout() Anda tetap sama) ...
+    
     public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -102,7 +107,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    // ... (Fungsi logout() tidak berubah) ...
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();

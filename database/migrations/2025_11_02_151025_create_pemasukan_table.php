@@ -13,8 +13,7 @@ return new class extends Migration
     {
         Schema::create('pemasukan', function (Blueprint $table) {
             $table->id();
-            $table->uuid('id_saas'); 
-            $table->string('nota');
+            $table->string('id_saas'); 
             $table->string('keterangan');
             $table->decimal('jumlah', 15, 2); 
             $table->date('tanggal');
