@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-// use Illuminate\Support\Str; // <-- Dihapus, tidak perlu lagi
 
 class AuthController extends Controller
 {
@@ -21,9 +20,16 @@ class AuthController extends Controller
         // 1. Validasi input
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            // --- PERUBAHAN VALIDASI ---
+            'username' => 'required|string|max:255|unique:users|alpha|lowercase', // Wajib, unik, hanya huruf, huruf kecil
+            'email' => 'nullable|string|email|max:255|unique:users', // Opsional, tapi jika diisi harus unik
             'password' => 'required|string|min:8|confirmed',
-            'nama_toko' => 'required|string|max:255', 
+            'nama_toko' => 'required|string|max:255',
+        ], [
+            // Pesan kustom untuk username
+            'username.alpha' => 'Username hanya boleh berisi huruf.',
+            'username.lowercase' => 'Username hanya boleh berisi huruf kecil.',
+            'username.unique' => 'Username ini sudah digunakan.',
         ]);
 
         if ($validator->fails()) {
@@ -38,13 +44,11 @@ class AuthController extends Controller
         try {
             $user = User::create([
                 'name' => $request->name,
-                'email' => $request->email,
+                'username' => $request->username, // <-- TAMBAHKAN
+                'email' => $request->email, // <-- Email sekarang bisa null
                 'password' => Hash::make($request->password),
-                'nama_toko' => $request->nama_toko, 
-                
-                // --- PERUBAHAN SESUAI PERMINTAAN ---
-                // id_saas diisi dari nama_toko saat registrasi admin pertama
-                'id_saas' => $request->nama_toko, 
+                'nama_toko' => $request->nama_toko,
+                'id_saas' => $request->nama_toko,
             ]);
 
             $token = $user->createToken('auth_token')->plainTextToken;
@@ -63,18 +67,19 @@ class AuthController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Registrasi gagal.',
-                // 'errors' mengirim string, BUKAN map. Ini yang menyebabkan error di Flutter.
-                'errors' => $e->getMessage() 
+                'errors' => $e->getMessage()
             ], 500);
         }
     }
 
-    // ... (Fungsi login() dan logout() Anda tetap sama) ...
-    
+    /**
+     * Handle user login.
+     */
     public function login(Request $request): JsonResponse
     {
+        // --- PERUBAHAN VALIDASI ---
         $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email',
+            'username' => 'required|string', // Menggunakan username
             'password' => 'required|string',
         ]);
 
@@ -86,14 +91,17 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        // --- PERUBAHAN AUTENTIKASI ---
+        // Mencoba login dengan 'username' dan 'password'
+        if (!Auth::attempt($request->only('username', 'password'))) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Email atau password salah.'
-            ], 401); 
+                'message' => 'Username atau password salah.' // Pesan error diubah
+            ], 401);
         }
 
-        $user = User::where('email', $request['email'])->firstOrFail();
+        // --- PERUBAHAN LOOKUP USER ---
+        $user = User::where('username', $request['username'])->firstOrFail();
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -107,6 +115,9 @@ class AuthController extends Controller
         ], 200);
     }
 
+    /**
+     * Handle user logout.
+     */
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
