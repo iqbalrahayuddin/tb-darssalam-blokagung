@@ -82,8 +82,14 @@ class DashboardController extends Controller
         
         // --- BATAS PERUBAHAN ---
 
+        // --- PERUBAHAN BARU: Clone query untuk mengambil data detail ---
+        // Kita clone SEBELUM di-groupBy
+        $pemasukanDetailQuery = (clone $pemasukanQuery);
+        $pengeluaranDetailQuery = (clone $pengeluaranQuery);
+        // --- BATAS PERUBAHAN ---
 
-        // Lanjutkan query dengan filter tanggal dan group by
+
+        // Lanjutkan query dengan filter tanggal dan group by (untuk Chart)
         $pemasukanPerHari = $pemasukanQuery
             ->whereBetween('tanggal', [$startDateQuery, $endDateQuery]) 
             ->groupBy(DB::raw('DATE(tanggal)'))
@@ -103,6 +109,42 @@ class DashboardController extends Controller
             )
             ->pluck('total_harian', 'tanggal_grup')
             ->map(fn($total) => (float)$total);
+
+        
+        // --- PERUBAHAN BARU: Ambil data detail untuk tabel SaldoDetailPage ---
+        $pemasukanDetail = $pemasukanDetailQuery
+            ->whereBetween('tanggal', [$startDateQuery, $endDateQuery])
+            ->select('tanggal', 'keterangan', 'jumlah')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    // Format tanggal agar konsisten
+                    'tanggal' => Carbon::parse($item->tanggal)->format('Y-m-d'), 
+                    'keterangan' => $item->keterangan ?? '-', // Beri default
+                    'pemasukan' => (float)$item->jumlah,
+                    'pengeluaran' => 0.0,
+                ];
+            });
+
+        $pengeluaranDetail = $pengeluaranDetailQuery
+            ->whereBetween('tanggal', [$startDateQuery, $endDateQuery])
+            ->select('tanggal', 'keterangan', 'jumlah')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'tanggal' => Carbon::parse($item->tanggal)->format('Y-m-d'),
+                    'keterangan' => $item->keterangan ?? '-', // Beri default
+                    'pemasukan' => 0.0,
+                    'pengeluaran' => (float)$item->jumlah,
+                ];
+            });
+
+        // Gabungkan dan urutkan berdasarkan tanggal
+        $detailData = $pemasukanDetail->merge($pengeluaranDetail)
+                                      ->sortBy('tanggal') // Urutkan berdasarkan tanggal
+                                      ->values() // Reset keys agar menjadi array
+                                      ->all();
+        // --- BATAS PERUBAHAN ---
 
 
         // 5. Buat array rentang tanggal penuh (untuk label chart)
@@ -137,7 +179,11 @@ class DashboardController extends Controller
                     'dates' => $dates,
                     'income' => $chartIncome,
                     'expense' => $chartExpense,
-                ]
+                ],
+
+                // --- PERUBAHAN BARU: Tambahkan detail data ke response ---
+                'detail_data' => $detailData
+                // --- BATAS PERUBAHAN ---
             ]
         ]);
     }
