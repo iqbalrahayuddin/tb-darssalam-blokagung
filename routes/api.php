@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\PengeluaranController; // <-- Import
 use App\Http\Controllers\Api\DashboardController; // <-- Import
 use App\Http\Controllers\Api\UserController; // <-- Import
 use App\Http\Controllers\Api\LaporanController; // <-- Import
+use App\Http\Controllers\Api\AppVersionController; // <-- Import
 
 // Endpoint publik
 Route::post('/register', [AuthController::class, 'register']);
@@ -47,3 +48,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/laporan-pdf', [LaporanController::class, 'downloadLaporanKeuangan']);
     // (Anda bisa tambahkan route API lain yang aman di sini)
 });
+
+// Ini adalah endpoint yang akan dicek oleh aplikasi Flutter Anda
+Route::get('/app-version', [AppVersionController::class, 'getLatestVersion']);
