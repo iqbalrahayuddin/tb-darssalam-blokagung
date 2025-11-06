@@ -22,14 +22,14 @@ class UserController extends Controller
         $admin = $request->user();
 
         // Mulai query
-        $query = User::query(); // <-- PERUBAHAN DI SINI
+        $query = User::query();
 
         // Jika admin BUKAN 'TB Pusat', filter HANYA data diri sendiri
         if ($admin->id_saas !== 'TB Pusat') {
-            $query->where('id', $admin->id); // <-- PERUBAHAN DI SINI
+            $query->where('id', $admin->id);
         } else {
             // Jika admin 'TB Pusat', tampilkan semua KECUALI diri sendiri
-            $query->where('id', '!=', $admin->id); // <-- PERUBAHAN DI SINI
+            $query->where('id', '!=', $admin->id);
         }
 
         $users = $query->latest()->get();
@@ -43,22 +43,31 @@ class UserController extends Controller
 
     /**
      * Menyimpan user baru yang dibuat oleh Admin.
-     * (Hanya bisa diakses oleh TB Pusat, UI Flutter akan menyembunyikan tombol)
+     * (Hanya bisa diakses oleh TB Pusat)
      */
     public function store(Request $request)
     {
+        // --- PERUBAHAN VALIDASI ---
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            // Username wajib, unik, hanya huruf, dan huruf kecil
+            'username' => 'required|string|max:255|unique:users|alpha|lowercase',
+             // Email opsional, tapi jika diisi, harus valid dan unik
+            'email' => 'nullable|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'nama_toko' => ['required', 'string', Rule::in([
                 'TB Pusat',
-                // 'SEMUA TOKO DIATAS', // <-- DIHILANGKAN
                 'TB mart', 'TB kantin', 'TB kitab', 'TB martabak',
                 'TB warung', 'TB farm', 'TB putri', 'TB londry Gus rozin',
                 'TB pentol', 'TB minuman kekinian', 'TB londry Ning wida'
             ])],
+        ], [
+            // Pesan kustom untuk username
+            'username.alpha' => 'Username hanya boleh berisi huruf.',
+            'username.lowercase' => 'Username hanya boleh berisi huruf kecil.',
+            'username.unique' => 'Username ini sudah digunakan.',
         ]);
+        // --- SELESAI PERUBAHAN ---
 
         if ($validator->fails()) {
             return response()->json([
@@ -71,19 +80,27 @@ class UserController extends Controller
         try {
             $plaintextPassword = $request->password;
 
+            // --- PERUBAHAN CREATE ---
             $user = User::create([
                 'name' => $request->name,
-                'email' => $request->email,
+                'username' => $request->username, // <-- TAMBAHKAN
+                'email' => $request->email, // <-- Akan 'null' jika tidak diisi
                 'password' => Hash::make($plaintextPassword),
                 'nama_toko' => $request->nama_toko,
                 'id_saas' => $request->nama_toko,
             ]);
+            // --- SELESAI PERUBAHAN ---
 
-            // Kirim email notifikasi
+            // Kirim email notifikasi HANYA JIKA email diisi
             try {
-                 Mail::to($user->email)->send(new UserRegisteredNotification($user, $plaintextPassword));
+                 // --- PERUBAHAN LOGIKA EMAIL ---
+                 if ($user->email) {
+                    Mail::to($user->email)->send(new UserRegisteredNotification($user, $plaintextPassword));
+                 }
+                 // --- SELESAI PERUBAHAN ---
             } catch (\Exception $mailException) {
                 // Opsional: Catat log jika email gagal terkirim
+                // \Log::error('Gagal kirim email registrasi: ' . $mailException->getMessage());
             }
 
             return response()->json([
@@ -115,50 +132,61 @@ class UserController extends Controller
 
         $isAdminPusat = ($admin->id_saas == 'TB Pusat');
         $isSameSaas = ($user->id_saas == $admin->id_saas);
-        $isSelf = ($admin->id == $user->id); // Cek apakah user mengedit diri sendiri
+        $isSelf = ($admin->id == $user->id);
 
         // Admin non-pusat hanya bisa edit diri sendiri
         if (!$isAdminPusat && !$isSelf) {
              return response()->json(['status' => 'error', 'message' => 'Anda tidak memiliki hak akses untuk mengedit user ini.'], 403);
         }
         
-        // Admin pusat bisa edit siapa saja di saas manapun
+        // Admin pusat bisa edit siapa saja
         // Admin non-pusat bisa edit diri sendiri
-        if (!$isAdminPusat && !$isSameSaas && !$isSelf) {
-             return response()->json(['status' => 'error', 'message' => 'Anda tidak memiliki hak akses untuk mengedit user ini.'], 403);
-        }
+        // (Logika $isSameSaas tidak relevan jika admin non-pusat HANYA bisa edit diri sendiri)
+        // if (!$isAdminPusat && !$isSameSaas && !$isSelf) {
+        //      return response()->json(['status' => 'error', 'message' => 'Anda tidak memiliki hak akses untuk mengedit user ini.'], 403);
+        // }
 
 
         // --- Logika Validasi berdasarkan Peran Admin ---
         $rules = [
             'name' => 'required|string|max:255',
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            // --- PERUBAHAN VALIDASI ---
+            'username' => ['required', 'string', 'max:255', 'alpha', 'lowercase', Rule::unique('users')->ignore($user->id)],
+            'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            // --- SELESAI PERUBAHAN ---
             'password' => 'nullable|string|min:8',
         ];
 
-        // Hanya Admin Pusat yang bisa mengubah 'nama_toko'
         if ($isAdminPusat) {
             $rules['nama_toko'] = ['required', 'string', Rule::in([
                 'TB Pusat',
-                // 'SEMUA TOKO DIATAS', // <-- DIHILANGKAN
                 'TB mart', 'TB kantin', 'TB kitab', 'TB martabak',
                 'TB warung', 'TB farm', 'TB putri', 'TB londry Gus rozin',
                 'TB pentol', 'TB minuman kekinian', 'TB londry Ning wida'
             ])];
         }
-        // --- Selesai Logika Validasi ---
 
-        $validator = Validator::make($request->all(), $rules);
+        // --- PERUBAHAN PESAN KUSTOM ---
+        $messages = [
+            'username.alpha' => 'Username hanya boleh berisi huruf.',
+            'username.lowercase' => 'Username hanya boleh berisi huruf kecil.',
+            'username.unique' => 'Username ini sudah digunakan.',
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+        // --- SELESAI PERUBAHAN ---
 
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'Validasi gagal', 'errors' => $validator->errors()], 422);
         }
 
         try {
+            // --- PERUBAHAN UPDATE ---
             $user->name = $request->name;
-            $user->email = $request->email;
+            $user->username = $request->username; // <-- TAMBAHKAN
+            $user->email = $request->email; // <-- Akan 'null' jika dikirim null
+            // --- SELESAI PERUBAHAN ---
 
-            // Hanya Admin Pusat yang dapat mengupdate nama_toko dan id_saas
             if ($isAdminPusat) {
                 $user->nama_toko = $request->nama_toko;
                 $user->id_saas = $request->nama_toko;
@@ -178,7 +206,7 @@ class UserController extends Controller
 
     /**
      * Menghapus user.
-     * (Hanya bisa diakses oleh TB Pusat, UI Flutter akan menyembunyikan tombol)
+     * (Hanya bisa diakses oleh TB Pusat)
      */
     public function destroy(Request $request, string $id)
     {
@@ -191,7 +219,6 @@ class UserController extends Controller
 
         $isAdminPusat = ($admin->id_saas == 'TB Pusat');
         
-        // Pengecekan: Hanya Admin Pusat yang dapat menghapus user.
         if (!$isAdminPusat) {
              return response()->json(['status' => 'error', 'message' => 'Hanya Admin Pusat yang dapat menghapus user.'], 403);
         }
