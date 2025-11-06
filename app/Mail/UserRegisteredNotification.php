@@ -16,6 +16,7 @@ class UserRegisteredNotification extends Mailable
 
     public $user;
     public $plaintextPassword;
+    public $username; // <-- TAMBAHAN
 
     /**
      * Create a new message instance.
@@ -24,6 +25,7 @@ class UserRegisteredNotification extends Mailable
     {
         $this->user = $user;
         $this->plaintextPassword = $plaintextPassword;
+        $this->username = $user->username; // <-- TAMBAHAN: Ambil username dari $user
     }
 
     /**
