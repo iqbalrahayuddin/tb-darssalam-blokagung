@@ -10,7 +10,7 @@ class AppVersionController extends Controller // <-- Tambahkan 'extends Controll
     public function getLatestVersion()
     {
         // GANTI PENGATURAN INI UNTUK TESTING
-        $versiServer = '1.0.2';
+        $versiServer = '1.0.1';
         $buildNumberServer = '2';
         $isCriticalServer = false; // <-- Atur ke 'true' untuk Wajib, 'false' untuk Opsional
 
