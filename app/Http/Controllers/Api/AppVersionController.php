@@ -25,7 +25,7 @@ class AppVersionController extends Controller
             'download_url' => $downloadUrl, // URL yang sudah diperbaiki
             'release_notes' => "• Perbaikan bug kritis.\n• Peningkatan keamanan data.\n• Mohon segera update.",
             'is_critical' => $isCriticalServer,
-            'minimum_required_version' => '1.0.2'
+            'minimum_required_version' => '1.0.2+3'
         ]);
     }
 }
