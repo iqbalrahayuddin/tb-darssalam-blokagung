@@ -12,7 +12,7 @@ class AppVersionController extends Controller // <-- Tambahkan 'extends Controll
         // GANTI PENGATURAN INI UNTUK TESTING
         $versiServer = '1.0.2';
         $buildNumberServer = '2';
-        $isCriticalServer = true; // <-- Atur ke 'true' untuk Wajib, 'false' untuk Opsional
+        $isCriticalServer = false; // <-- Atur ke 'true' untuk Wajib, 'false' untuk Opsional
 
         // Pastikan nama file ini benar dan ada di 'public/storage/'
         $namaFileApk = 'tb_pusat_v1.0.1.apk'; 
